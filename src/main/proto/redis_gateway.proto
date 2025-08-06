@@ -1,0 +1,162 @@
+
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.codelry.redis.gateway.grpc";
+option java_outer_classname = "RedisGatewayProto";
+
+package redis_gateway;
+
+service RedisGateway {
+  // String commands
+  rpc Put (PutRequest) returns (PutResponse);
+  rpc Get (GetRequest) returns (GetResponse);
+  rpc Delete (DeleteRequest) returns (DeleteResponse);
+
+  // Hash commands
+  rpc HSet (HSetRequest) returns (PutResponse);
+  rpc HGet (HGetRequest) returns (GetResponse);
+  rpc HGetAll(HGetAllRequest) returns (HGetAllResponse);
+
+  // Set commands
+  rpc SAdd(SAddRequest) returns (PutResponse);
+  rpc SMembers(SMembersRequest) returns (SMembersResponse);
+
+  // Sorted Set commands
+  rpc ZAdd(ZAddRequest) returns (PutResponse);
+  rpc ZRange(ZRangeRequest) returns (ZRangeResponse);
+
+  // Vector commands
+  rpc VectorAdd(VectorAddRequest) returns (PutResponse);
+  rpc VectorSearch(VectorSearchRequest) returns (VectorSearchResponse);
+
+  // JSON commands
+  rpc JsonSet(JsonSetRequest) returns (PutResponse);
+  rpc JsonGet(JsonGetRequest) returns (JsonGetResponse);
+}
+
+// General purpose messages
+message PutResponse {
+  bool success = 1;
+}
+
+message GetResponse {
+  string value = 1;
+}
+
+message DeleteResponse {
+  bool success = 1;
+  int64 deleted_count = 2;
+}
+
+// String messages
+message PutRequest {
+  string key = 1;
+  string value = 2;
+}
+
+message GetRequest {
+  string key = 1;
+}
+
+message DeleteRequest {
+  repeated string keys = 1;
+}
+
+// Hash messages
+message HSetRequest {
+  string key = 1;
+  string field = 2;
+  string value = 3;
+}
+
+message HGetRequest {
+  string key = 1;
+  string field = 2;
+}
+
+message HGetAllRequest {
+  string key = 1;
+}
+
+message HGetAllResponse {
+  map<string, string> fields = 1;
+}
+
+// Set messages
+message SAddRequest {
+  string key = 1;
+  repeated string members = 2;
+}
+
+message SMembersRequest {
+  string key = 1;
+}
+
+message SMembersResponse {
+  repeated string members = 1;
+}
+
+// Sorted Set messages
+message ScoreMember {
+  double score = 1;
+  string member = 2;
+}
+
+message ZAddRequest {
+  string key = 1;
+  repeated ScoreMember members = 2;
+}
+
+message ZRangeRequest {
+  string key = 1;
+  int64 start = 2;
+  int64 stop = 3;
+}
+
+message ZRangeResponse {
+  repeated string members = 1;
+}
+
+// Vector messages
+message VectorAddRequest {
+  string key = 1;
+  string field = 2;
+  repeated float vector = 3;
+  map<string, string> metadata = 4;
+}
+
+message VectorSearchRequest {
+  string index_name = 1;
+  repeated float query_vector = 2;
+  int32 k = 3;
+  optional string filter = 4;
+  optional string vector_field = 5;
+}
+
+message VectorSearchResult {
+  string key = 1;
+  float score = 2;
+  map<string, string> metadata = 3;
+}
+
+message VectorSearchResponse {
+  repeated VectorSearchResult results = 1;
+  int64 total_results = 2;
+}
+
+// JSON messages
+message JsonSetRequest {
+  string key = 1;
+  string path = 2;
+  string json = 3;
+}
+
+message JsonGetRequest {
+  string key = 1;
+  string path = 2;
+}
+
+message JsonGetResponse {
+  string json = 1;
+}
