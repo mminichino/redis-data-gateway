@@ -1,6 +1,6 @@
 package com.codelry.redis.gateway.service;
 
-import com.codelry.redis.gateway.grpc.*;
+import com.codelry.redis.gateway.data.*;
 import com.redis.lettucemod.api.StatefulRedisModulesConnection;
 import com.redis.lettucemod.api.sync.RedisModulesCommands;
 import com.redis.lettucemod.search.Document;

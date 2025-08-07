@@ -7,7 +7,6 @@ import io.lettuce.core.RedisURI;
 import io.lettuce.core.SslOptions;
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.resource.ClientResources;
-import io.lettuce.core.resource.DefaultClientResources;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.springframework.beans.factory.annotation.Value;

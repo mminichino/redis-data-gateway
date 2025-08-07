@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.codelry.redis.gateway.stream";
+option java_outer_classname = "RedisStreamProto";
+
+package gateway.stream;
+
+service RedisStreamer {
+  rpc StreamByPattern (StreamRequest) returns (stream JsonItem);
+}
+
+message StreamRequest {
+  string pattern = 1;
+  uint32 count   = 2;
+}
+
+message JsonItem {
+  bytes json = 1;
+}

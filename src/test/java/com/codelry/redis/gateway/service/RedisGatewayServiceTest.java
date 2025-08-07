@@ -1,6 +1,6 @@
 package com.codelry.redis.gateway.service;
 
-import com.codelry.redis.gateway.grpc.*;
+import com.codelry.redis.gateway.data.*;
 import com.redis.testcontainers.RedisContainer;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.junit.jupiter.api.Test;

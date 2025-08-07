@@ -1,11 +1,10 @@
-
 syntax = "proto3";
 
 option java_multiple_files = true;
-option java_package = "com.codelry.redis.gateway.grpc";
+option java_package = "com.codelry.redis.gateway.data";
 option java_outer_classname = "RedisGatewayProto";
 
-package redis_gateway;
+package gateway.data;
 
 service RedisGateway {
   // String commands
