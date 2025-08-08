@@ -74,7 +74,11 @@ public class RedisStreamerService extends RedisStreamerGrpc.RedisStreamerImplBas
       @Override
       public boolean hasNext() {
         if (pageIter.hasNext()) return true;
-        if (finished) return false;
+
+        if (finished || cursor.isFinished()) {
+          finished = true;
+          return false;
+        }
 
         KeyScanCursor<String> page;
         try {
@@ -96,9 +100,9 @@ public class RedisStreamerService extends RedisStreamerGrpc.RedisStreamerImplBas
         pageIter = keys.iterator();
 
         if (!pageIter.hasNext()) {
-          finished = cursor.isFinished();
-          return !finished && hasNext();
+          return hasNext();
         }
+
         return true;
       }
 
