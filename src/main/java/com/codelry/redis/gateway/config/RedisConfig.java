@@ -21,6 +21,7 @@ import org.springframework.data.redis.connection.lettuce.LettucePoolingClientCon
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.util.StringUtils;
+import org.springframework.context.annotation.DependsOn;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
@@ -149,6 +150,7 @@ public class RedisConfig {
     }
 
     @Bean(destroyMethod = "close")
+    @DependsOn("redisConnectionFactory")
     public StatefulRedisModulesConnection<String, String> modulesConnection() throws Exception {
       RedisURI.Builder builder = RedisURI.builder()
           .withHost(redisHost)
@@ -164,14 +166,16 @@ public class RedisConfig {
 
       RedisModulesClient client = RedisModulesClient.create(builder.build());
 
-      SslOptions sslOptions = createSslOptions();
-
-      client.setOptions(ClientOptions.builder()
+      ClientOptions.Builder options = ClientOptions.builder()
           .autoReconnect(true)
-          .pingBeforeActivateConnection(true)
-          .sslOptions(sslOptions)
-          .build());
+          .pingBeforeActivateConnection(true);
 
+      if (useSsl) {
+        SslOptions sslOptions = createSslOptions();
+        options.sslOptions(sslOptions);
+      }
+
+      client.setOptions(options.build());
       return client.connect();
     }
 

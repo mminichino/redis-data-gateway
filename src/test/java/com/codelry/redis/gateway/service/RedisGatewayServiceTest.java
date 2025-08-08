@@ -2,16 +2,21 @@ package com.codelry.redis.gateway.service;
 
 import com.codelry.redis.gateway.data.*;
 import com.redis.testcontainers.RedisContainer;
+import net.devh.boot.grpc.client.channelfactory.GrpcChannelConfigurer;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.containers.wait.strategy.Wait;
 
+import javax.net.ssl.SSLException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -21,18 +26,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(
     properties = {
-        "grpc.server.port=9090",
+        "grpc.server.port=9443",
         "logging.level.com.codelry=DEBUG"
     }
 )
-
 @Testcontainers
 public class RedisGatewayServiceTest {
 
   @Container
   static GenericContainer<?> redis = new RedisContainer(DockerImageName.parse("redis/redis-stack:latest"))
-      .withExposedPorts(6379)
-      .withReuse(true);
+      .waitingFor(Wait.forListeningPort());
 
   @GrpcClient("GLOBAL")
   private RedisGatewayGrpc.RedisGatewayBlockingStub blockingStub;
@@ -44,8 +47,30 @@ public class RedisGatewayServiceTest {
     registry.add("spring.data.redis.password", () -> "");
     registry.add("spring.data.redis.database", () -> "0");
     registry.add("spring.data.redis.ssl.enabled", () -> "false");
-    registry.add("grpc.client.GLOBAL.address", () -> "static://localhost:" + System.getProperty("grpc.server.port", "9090"));
-    registry.add("grpc.client.GLOBAL.negotiationType", () -> "PLAINTEXT");
+    registry.add("grpc.client.GLOBAL.address", () -> "static://localhost:9443");
+    registry.add("grpc.client.GLOBAL.negotiationType", () -> "TLS");
+  }
+
+  @TestConfiguration
+  static class InsecureTlsClientConfig {
+    @Bean
+    GrpcChannelConfigurer insecureTrustAllConfigurer() {
+      return (builder, name) -> {
+        if (!"GLOBAL".equals(name)) {
+          return;
+        }
+        if (builder instanceof io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder netty) {
+          try {
+            var sslContext = io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts.forClient()
+                .trustManager(io.grpc.netty.shaded.io.netty.handler.ssl.util.InsecureTrustManagerFactory.INSTANCE)
+                .build();
+            netty.sslContext(sslContext).useTransportSecurity();
+          } catch (SSLException e) {
+            throw new IllegalStateException("Failed to configure test TLS trust-all", e);
+          }
+        }
+      };
+    }
   }
 
   @Test
@@ -197,11 +222,11 @@ public class RedisGatewayServiceTest {
         .setKey(key)
         .setPath(path)
         .build();
-    JsonGetResponse jsonGetResponse = blockingStub.jsonGet(jsonGetRequest);
-    assertNotNull(jsonGetResponse.getJson(), "JSON get response should not be null");
-    assertFalse(jsonGetResponse.getJson().isEmpty(), "JSON response should not be empty");
+    JsonGetResponse jsonResponse = blockingStub.jsonGet(jsonGetRequest);
+    assertNotNull(jsonResponse.getJson(), "JSON get response should not be null");
+    assertFalse(jsonResponse.getJson().isEmpty(), "JSON response should not be empty");
 
-    String responseJson = jsonGetResponse.getJson();
+    String responseJson = jsonResponse.getJson();
     assertTrue(responseJson.contains("John") || responseJson.contains("\"John\""),
         "JSON should contain expected name");
     assertTrue(responseJson.contains("30") || responseJson.contains("\"30\""),
@@ -303,9 +328,10 @@ public class RedisGatewayServiceTest {
     String key2 = "test:multi-delete:2:" + timestamp;
     String key3 = "test:multi-delete:3:" + timestamp;
 
-    blockingStub.put(PutRequest.newBuilder().setKey(key1).setValue("value1").build());
-    blockingStub.put(PutRequest.newBuilder().setKey(key2).setValue("value2").build());
-    blockingStub.put(PutRequest.newBuilder().setKey(key3).setValue("value3").build());
+    PutResponse r1 = blockingStub.put(PutRequest.newBuilder().setKey(key1).setValue("value1").build());
+    PutResponse r2 = blockingStub.put(PutRequest.newBuilder().setKey(key2).setValue("value2").build());
+    PutResponse r3 = blockingStub.put(PutRequest.newBuilder().setKey(key3).setValue("value3").build());
+    assertTrue(r1.getSuccess() && r2.getSuccess() && r3.getSuccess(), "All puts should be successful");
 
     DeleteRequest deleteRequest = DeleteRequest.newBuilder()
         .addKeys(key1)

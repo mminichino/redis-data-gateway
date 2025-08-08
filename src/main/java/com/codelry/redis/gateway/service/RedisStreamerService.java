@@ -26,6 +26,7 @@ public class RedisStreamerService extends RedisStreamerGrpc.RedisStreamerImplBas
   private static final Logger logger = LoggerFactory.getLogger(RedisStreamerService.class);
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final String INTERNAL_PREFIX = "__gateway__";
   private final RedisModulesCommands<String, String> modulesCommands;
 
   @Autowired
@@ -59,7 +60,9 @@ public class RedisStreamerService extends RedisStreamerGrpc.RedisStreamerImplBas
 
   private Iterator<JsonItem> scanAsIterator(StreamRequest req) {
     String pattern = req.getPattern().isBlank() ? "*" : req.getPattern();
-    int count = req.getCount() == 0 ? 200 : req.getCount();
+
+    int requested = req.getCount();
+    int count = requested <= 0 ? 200 : Math.min(requested, 10_000);
 
     ScanArgs args = ScanArgs.Builder.matches(pattern).limit(count);
 
@@ -72,9 +75,26 @@ public class RedisStreamerService extends RedisStreamerGrpc.RedisStreamerImplBas
       public boolean hasNext() {
         if (pageIter.hasNext()) return true;
         if (finished) return false;
-        KeyScanCursor<String> page = modulesCommands.scan(cursor, args);
+
+        KeyScanCursor<String> page;
+        try {
+          page = modulesCommands.scan(cursor, args);
+        } catch (IllegalArgumentException | RedisException ex) {
+          logger.error("SCAN failed (pattern='{}', count={})", pattern, count, ex);
+          finished = true;
+          return false;
+        }
+
         cursor = page;
-        pageIter = page.getKeys().iterator();
+
+        List<String> keys = page.getKeys();
+        if (!keys.isEmpty()) {
+          keys = keys.stream()
+              .filter(k -> !k.startsWith(INTERNAL_PREFIX))
+              .toList();
+        }
+        pageIter = keys.iterator();
+
         if (!pageIter.hasNext()) {
           finished = cursor.isFinished();
           return !finished && hasNext();
@@ -118,9 +138,11 @@ public class RedisStreamerService extends RedisStreamerGrpc.RedisStreamerImplBas
 
   private JsonNode getJson(RedisModulesCommands<String, String> commands, String key) {
     try {
-      String json = commands.jsonGet(key, JsonPath.of("$")).toString();
-      if (json == null) return NullNode.getInstance();
-      return MAPPER.readTree(json);
+      Object res = commands.jsonGet(key, JsonPath.of("$"));
+      if (res == null) {
+        return NullNode.getInstance();
+      }
+      return MAPPER.valueToTree(res);
     } catch (Exception e) {
       return stringAsJson(commands, key);
     }
