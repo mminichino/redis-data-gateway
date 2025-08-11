@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.redis.testcontainers.RedisContainer;
 import net.devh.boot.grpc.client.channelfactory.GrpcChannelConfigurer;
 import net.devh.boot.grpc.client.inject.GrpcClient;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -16,6 +17,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -27,6 +29,9 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(
@@ -37,6 +42,9 @@ import static org.junit.jupiter.api.Assertions.*;
 )
 @Testcontainers
 public class RedisGatewayStreamTest {
+
+  private static final Logger logger = LoggerFactory.getLogger(RedisGatewayStreamTest.class);
+  private static final Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger);
 
   @Container
   static GenericContainer<?> redis = new RedisContainer(DockerImageName.parse("redis/redis-stack:latest"))
@@ -79,6 +87,11 @@ public class RedisGatewayStreamTest {
         }
       };
     }
+  }
+
+  @BeforeAll
+  public static void beforeAll() {
+    redis.followOutput(logConsumer);
   }
 
   @Test
@@ -126,5 +139,6 @@ public class RedisGatewayStreamTest {
     assertEquals(5, count.get(), "Expected 5 streamed results");
     assertTrue(receivedKeys.containsAll(Set.of(key1, key2, key3, key4, key5)),
         "Stream should contain all inserted keys");
+    logger.info("testStreamOperation: SUCCESS: Received {} items", count.get());
   }
 }

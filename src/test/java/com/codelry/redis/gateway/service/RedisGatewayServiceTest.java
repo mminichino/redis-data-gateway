@@ -4,6 +4,7 @@ import com.codelry.redis.gateway.data.*;
 import com.redis.testcontainers.RedisContainer;
 import net.devh.boot.grpc.client.channelfactory.GrpcChannelConfigurer;
 import net.devh.boot.grpc.client.inject.GrpcClient;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -11,6 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -22,6 +24,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(
@@ -32,6 +37,9 @@ import static org.junit.jupiter.api.Assertions.*;
 )
 @Testcontainers
 public class RedisGatewayServiceTest {
+
+  private static final Logger logger = LoggerFactory.getLogger(RedisGatewayServiceTest.class);
+  private static final Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger);
 
   @Container
   static GenericContainer<?> redis = new RedisContainer(DockerImageName.parse("redis/redis-stack:latest"))
@@ -73,6 +81,11 @@ public class RedisGatewayServiceTest {
     }
   }
 
+  @BeforeAll
+  public static void beforeAll() {
+    redis.followOutput(logConsumer);
+  }
+
   @Test
   public void testStringDataType() {
     String key = "test:string:" + System.currentTimeMillis();
@@ -90,6 +103,7 @@ public class RedisGatewayServiceTest {
         .build();
     GetResponse getResponse = blockingStub.get(getRequest);
     assertEquals(value, getResponse.getValue(), "Retrieved string should match");
+    logger.info("testStringDataType: SUCCESS: Retrieved string: {}", getResponse.getValue());
   }
 
   @Test
@@ -120,6 +134,7 @@ public class RedisGatewayServiceTest {
     Map<String, String> fields = hgetAllResponse.getFieldsMap();
     assertTrue(fields.containsKey(field), "Hash should contain the field");
     assertEquals(value, fields.get(field), "Hash field value should match");
+    logger.info("testHashDataType: SUCCESS: Retrieved hash field: {}", fields.get(field));
   }
 
   @Test
@@ -144,6 +159,7 @@ public class RedisGatewayServiceTest {
     for (String member : members) {
       assertTrue(retrievedMembers.contains(member), "Set should contain " + member);
     }
+    logger.info("testSetDataType: SUCCESS: Retrieved set members: {}", retrievedMembers);
   }
 
   @Test
@@ -183,6 +199,7 @@ public class RedisGatewayServiceTest {
     assertEquals("player1", rangeMembers.get(0), "First member should be player1 (lowest score)");
     assertEquals("player3", rangeMembers.get(1), "Second member should be player3");
     assertEquals("player2", rangeMembers.get(2), "Third member should be player2 (highest score)");
+    logger.info("testSortedSetDataType: SUCCESS: Retrieved sorted set members: {}", rangeMembers);
   }
 
   @Test
@@ -202,6 +219,7 @@ public class RedisGatewayServiceTest {
         .build();
     PutResponse vectorAddResponse = blockingStub.vectorAdd(vectorAddRequest);
     assertTrue(vectorAddResponse.getSuccess(), "Vector add should be successful");
+    logger.info("testVectorDataType: SUCCESS: Vector add response: {}", vectorAddResponse);
   }
 
   @Test
@@ -233,6 +251,7 @@ public class RedisGatewayServiceTest {
         "JSON should contain expected age");
     assertTrue(responseJson.contains("New York") || responseJson.contains("\"New York\""),
         "JSON should contain expected city");
+    logger.info("testJsonDataType: SUCCESS: Retrieved JSON: {}", responseJson);
   }
 
   @Test
@@ -262,6 +281,7 @@ public class RedisGatewayServiceTest {
 
     GetResponse getResponseAfterDelete = blockingStub.get(getRequest);
     assertTrue(getResponseAfterDelete.getValue().isEmpty(), "Value should be empty after deletion");
+    logger.info("testDeleteOperation: SUCCESS: Deleted key: {}", key);
   }
 
   @Test
@@ -319,6 +339,7 @@ public class RedisGatewayServiceTest {
         .build());
     assertNotNull(jsonResponse.getJson(), "JSON response should not be null");
     assertTrue(jsonResponse.getJson().contains("complete"), "JSON should contain expected data");
+    logger.info("testCompleteWorkflow: SUCCESS: Workflow completed");
   }
 
   @Test
@@ -342,5 +363,6 @@ public class RedisGatewayServiceTest {
 
     assertTrue(deleteResponse.getSuccess(), "Multi-delete should be successful");
     assertEquals(3, deleteResponse.getDeletedCount(), "Should delete exactly 3 keys");
+    logger.info("testMultipleDeleteOperation: SUCCESS: Deleted 3 keys");
   }
 }
